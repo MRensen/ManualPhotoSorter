@@ -8,6 +8,15 @@ from tkinter import filedialog
 import cv2
 import PIL.Image, PIL.ImageTk
 from tkinter import messagebox
+from tkinter import simpledialog
+
+class FolderButton():
+    def __init__(self, master, text, event):
+        self.master = master
+        self.text = text
+        self.event = event
+        self.Button = tk.Button(master, text=text, anchor=tk.SE, command=event)
+
 
 
 class GUI(tk.Frame):
@@ -16,50 +25,56 @@ class GUI(tk.Frame):
         w,h = 650, 650
         master.minsize(width=w, height=h)
         master.maxsize(width=w, height=h)
-        #TODO: move all buttons into this frame
-        buttonFrame = tk.Frame(master, width=w, height=50, borderwidth=5)
-        self.pack()
 
-        self.add_button = tk.Button(self, text="add folder", anchor=tk.SE, command=self.add_folder_button)
+        self.photo_counter = 0
+        self.extensions = ['.jpg', '.jpeg', '.img', '.png']
+        self.photos = []
+        self.folderButton_list = []  # list of folders the user can choose between to export the photo to
+
+        self.container = tk.Canvas(self, width=650, height=620)
+        self.buttonFrame = tk.Frame(master)
+
+        #packs
+        self.container.pack()
+        self.pack()
+        self.buttonFrame.pack()
+
+        self.add_button = tk.Button(self.buttonFrame, text="add folder", anchor=tk.SE, command=self.add_folder_button)
         self.add_button.pack()
 
         self.import_from_folder = '/home/mark/Pictures' #filedialog.askdirectory()
-        self.extensions = ['.jpg', '.jpeg', '.img', '.png']
-        self.photos = []
-        self.export_folders_list = [] #list of folders the user can choose between to export the photo to
+
         self.get_photos()
 
+        self.container.create_image(20, 20, anchor=tk.CENTER, image=self.photos[self.photo_counter])
+
+    def folderButton_click(self):
+        return
 
     def add_folder_button(self):
         # user wants to add a new folder to export to. Check if folder allready exists on drive, else make new folder.
         answer = tk.messagebox.askquestion("new folder", "Do you want to create a new folder? Select 'no' if you want to use an existing folder")
+        folder = ""
         if answer == "yes":
-            dir = filedialog.askdirectory()
+            #TODO:create new folder
+            folder = True
         if answer == "no":
-            dir = "no"
-        print(dir)
+            #select folder
+            folder = filedialog.askdirectory()
+        text = tk.simpledialog.askstring(title="name", prompt="what is the name of this folder?")
+        button = FolderButton(self.buttonFrame, text, self.folderButton_click)
+        if folder in self.folderButton_list:
+            tk.messagebox.showwarning('', 'Folder already exists')
+            self.add_folder_button()
+            return
+        else:
+            self.folderButton_list.append(button)
+
+
+
+
+        print(folder)
         return
-
-
-    def handle_path(self, file_path):
-        #TODO: remove this method
-
-        #img_height, img_width, img_channels = img.shape
-        container = tk.Label(root, image=image)
-        container.pack()
-        print("should not get here")
-
-        # cv2.imshow('image', img)
-        # cv2.startWindowThread()
-        # #cannot get around using Waitkey, but it's effect is cancelled like this.
-        # waitkey = cv2.waitKey(1000)
-        # print(waitkey)
-
-
-        self.handle_img(file_path)
-        #cv2.destroyAllWindows()
-
-
 
 
     def get_photos(self):
@@ -79,7 +94,7 @@ class GUI(tk.Frame):
 
 
 root = tk.Tk()
-root.title = "Photo Sorter"
+root.title("Photo Sorter")
 app = GUI(master=root)
 app.mainloop()
 root.destroy()
