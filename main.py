@@ -2,10 +2,10 @@
 # coding=utf-8
 
 import os
+from sys import platform
 import time
 import tkinter as tk
 from tkinter import filedialog
-import cv2
 import PIL.Image, PIL.ImageTk
 from tkinter import messagebox
 from tkinter import simpledialog
@@ -40,6 +40,8 @@ def resize_to_screen(img, masterw, masterh):
 
 
 
+
+
 class GUI(tk.Frame):
     def __init__(self, master=None):
         tk.Frame.__init__(self, master)
@@ -48,9 +50,8 @@ class GUI(tk.Frame):
         master.minsize(width=self.w, height=self.h)
         master.maxsize(width=self.w, height=self.h)
 
-        self.base_path = "/home/"+getpass.getuser()+"/Pictures/PhotoSorter"
-        if not os.path.isdir(self.base_path): #make sure basepath exists, else make it
-            os.mkdir(self.base_path)
+        self.base_path = self.get_base_path()
+        self.platform = ""
         self.photo_counter = 0
         self.extensions = ['.jpg', '.jpeg', '.img', '.png']
         self.photos = []
@@ -67,11 +68,30 @@ class GUI(tk.Frame):
         self.add_button = tk.Button(self.buttonFrame, text="add folder", anchor=tk.SE, command=self.add_folder_button)
         self.add_button.pack()
 
-        self.import_from_folder = '/home/mark/Pictures' #filedialog.askdirectory()
+        self.import_from_folder = filedialog.askdirectory()
 
         self.get_photos()
+        self.create_image()
 
+    def create_image(self):
+        #TODO: make it so that images get created and deleted here
         self.container.create_image(self.w/2, self.h/2, image=self.photos[self.photo_counter])
+
+    def get_base_path(self):
+        base_path = ""
+        if platform.startswith("linux") or platform.startswith("linux2"):
+            self.platform = "linux"
+            base_path = "/home/" + getpass.getuser() + "/Pictures/PhotoSorter"
+        elif platform.startswith("win32"):
+            self.platform = "win32"
+            #TODO: can't find where base_path is stored in explorer, find it.
+            base_path = "/c/Users/" + getpass.getuser() + "/Pictures/PhotoSorter"
+        else:
+            #TODO check is this doesn't cause issues
+            raise Exception("cannot find operating system")
+        if not os.path.isdir(base_path):  # make sure basepath exists, else make it
+            os.makedirs(base_path)
+        return base_path
 
     def folderButton_click(self):
         return
@@ -90,12 +110,16 @@ class GUI(tk.Frame):
                 tk.messagebox.showwarning('', 'Folder already exists')
                 self.add_folder_button()
                 return
+
         if answer == "no":
             #select folder
-            #TODO: see if askdirectory() can be initiated from a different location, aka base_path
             folder = filedialog.askdirectory(initialdir=self.base_path)
             folder_tuple = folder.split()
             text = folder_tuple[1]
+
+        self.photo_counter += 1
+        self.create_image()
+
         #text = tk.simpledialog.askstring(title="name", prompt="what is the name of this folder?")
         button = FolderButton(self.buttonFrame, text, self.folderButton_click)
         if button in self.folderButton_list:
