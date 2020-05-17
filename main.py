@@ -11,15 +11,16 @@ from tkinter import messagebox
 from tkinter import simpledialog
 import getpass
 
-class FolderButton():
+
+class FolderButton(tk.Button):
     def __init__(self, master, text, event):
+        super(FolderButton, self).__init__(master, text=text, command=event)
         self.master = master
         self.text = text
         self.event = event
         self.Button = tk.Button(master, text=text, anchor=tk.SE, command=event)
 
-    def pack(self):
-        self.Button.pack()
+
 
 
 def resize_to_screen(img, masterw, masterh):
@@ -45,55 +46,74 @@ def resize_to_screen(img, masterw, masterh):
 class GUI(tk.Frame):
     def __init__(self, master=None):
         tk.Frame.__init__(self, master)
-        self.w,self.h = 650, 650
+        self.w, self.h = 700, 700
         self.buttonHeightOffset = 30
         master.minsize(width=self.w, height=self.h)
         master.maxsize(width=self.w, height=self.h)
 
         self.base_path = self.get_base_path()
+        self.home_path = self.base_path + "/Pictures/PhotoSorter"
         self.platform = ""
         self.photo_counter = 0
         self.extensions = ['.jpg', '.jpeg', '.img', '.png']
         self.photos = []
         self.folderButton_list = []  # list of folders the user can choose between to export the photo to
 
-        self.container = tk.Canvas(self, width=self.w, height=self.h-self.buttonHeightOffset)
-        self.buttonFrame = tk.Frame(master)
-
-        #packs
+        self.container = tk.Canvas(self, bg="black")
+        self.buttonFrame = tk.Frame(master, width=self.w, height=self.buttonHeightOffset)
         self.container.pack()
+        self.buttonFrame.pack(side=tk.BOTTOM)
         self.pack()
-        self.buttonFrame.pack()
 
-        self.add_button = tk.Button(self.buttonFrame, text="add folder", anchor=tk.SE, command=self.add_folder_button)
-        self.add_button.pack()
+        self.add_button = None
 
-        self.import_from_folder = filedialog.askdirectory()
+        self.import_from_folder = ""
+        self.importWait = True
+        self.startButton = tk.Button(self.container, takefocus=True, text="Click here to select folder",
+                                     command=self.get_import_folder)
+        self.startButton.pack()
 
+
+    def get_import_folder(self):
+        self.import_from_folder = filedialog.askdirectory(initialdir=self.base_path + "/Pictures")
+        self.startButton.destroy()
         self.get_photos()
         self.create_image()
+        self.add_button = tk.Button(self.buttonFrame, text="add folder", anchor=tk.SE, command=self.add_folder_button) \
+            .pack(side=tk.LEFT)
 
     def create_image(self):
         #TODO: make it so that images get created and deleted here
+        self.container.delete(tk.ALL)
+        if self.container.winfo_width() != self.w:
+            self.container.configure(height=self.h-self.buttonHeightOffset, width=self.w)
         self.container.create_image(self.w/2, self.h/2, image=self.photos[self.photo_counter])
+        print(self.container.winfo_height())
 
     def get_base_path(self):
         base_path = ""
+        user = getpass.getuser()
         if platform.startswith("linux") or platform.startswith("linux2"):
             self.platform = "linux"
-            base_path = "/home/" + getpass.getuser() + "/Pictures/PhotoSorter"
+            base_path = "/home/" + user
         elif platform.startswith("win32"):
             self.platform = "win32"
-            #TODO: can't find where base_path is stored in explorer, find it.
-            base_path = "/c/Users/" + getpass.getuser() + "/Pictures/PhotoSorter"
+            #TODO: can't find where base_path is stored in windows explorer, find it.
+            base_path = "/c/Users/" + user
         else:
-            #TODO check is this doesn't cause issues
+
             raise Exception("cannot find operating system")
         if not os.path.isdir(base_path):  # make sure basepath exists, else make it
             os.makedirs(base_path)
         return base_path
 
-    def folderButton_click(self):
+    def folderButton_click(self, folder_path):
+        self.photo_counter += 1
+
+        #TODO: make sure image gets moved to location here
+
+        self.create_image()
+
         return
 
     def add_folder_button(self):
@@ -102,40 +122,33 @@ class GUI(tk.Frame):
         folder = ""
         text = ""
         if answer == "yes":
-            #TODO:create new folder
             text = folder = tk.simpledialog.askstring("Folder name", "What would you like your new folder called?")
             try:
-                os.mkdir(self.base_path + "/" + folder)
+                os.mkdir(self.home_path + "/" + folder)
             except FileExistsError:
                 tk.messagebox.showwarning('', 'Folder already exists')
                 self.add_folder_button()
                 return
-
-        if answer == "no":
+        elif answer == "no":
             #select folder
-            folder = filedialog.askdirectory(initialdir=self.base_path)
-            folder_tuple = folder.split()
-            text = folder_tuple[1]
-
-        self.photo_counter += 1
-        self.create_image()
+            folder = filedialog.askdirectory(initialdir=self.home_path)
+            folder_tuple = folder.split('/')
+            text = folder_tuple[len(folder_tuple)-1]
+        else:
+            return
 
         #text = tk.simpledialog.askstring(title="name", prompt="what is the name of this folder?")
-        button = FolderButton(self.buttonFrame, text, self.folderButton_click)
+        button = FolderButton(self.buttonFrame, text, lambda: self.folderButton_click(folder))
         if button in self.folderButton_list:
+            button.destroy()
             tk.messagebox.showwarning('', 'Folder already exists')
             self.add_folder_button()
             return
         else:
             self.folderButton_list.append(button)
         print(self.folderButton_list)
-        button.pack()
+        button.pack(side=tk.LEFT)
         self.buttonFrame.pack()
-
-
-
-
-        print(folder)
         return
 
 
