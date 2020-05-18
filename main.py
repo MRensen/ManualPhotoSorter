@@ -10,15 +10,21 @@ import PIL.Image, PIL.ImageTk
 from tkinter import messagebox
 from tkinter import simpledialog
 import getpass
+import _pickle as pickle
 
 
 class FolderButton(tk.Button):
-    def __init__(self, master, text, event):
-        super(FolderButton, self).__init__(master, text=text, command=event)
+    def __init__(self, master, text, path):
+        super(FolderButton, self).__init__(master, text=text, command=self.callback)
         self.master = master
         self.text = text
-        self.event = event
-        self.Button = tk.Button(master, text=text, anchor=tk.SE, command=event)
+        self.path = path
+
+    def callback(self):
+        app.folderButton_click(self)
+
+    def save(self):
+        return self.master, self.text, self.path
 
 
 
@@ -53,13 +59,17 @@ class GUI(tk.Frame):
 
         self.base_path = self.get_base_path()
         self.home_path = self.base_path + "/Pictures/PhotoSorter"
-        self.platform = ""
-        self.photo_counter = 0
+        if not os.path.isdir(self.home_path):  # make sure home_path exists, else make it
+            os.makedirs(self.home_path)
+        self.platform = ""  # stores whether user is using linux or windows
+        self.photo_counter = 0  # this is mainly just the index for walking through the photos array
         self.extensions = ['.jpg', '.jpeg', '.img', '.png']
-        self.photos = []
+        self.photos = [] # array of tuples (photo, photo_path)
         self.folderButton_list = []  # list of folders the user can choose between to export the photo to
 
-        self.container = tk.Canvas(self, bg="black")
+
+        # instantiate widgets
+        self.container = tk.Canvas(self)
         self.buttonFrame = tk.Frame(master, width=self.w, height=self.buttonHeightOffset)
         self.container.pack()
         self.buttonFrame.pack(side=tk.BOTTOM)
@@ -67,30 +77,37 @@ class GUI(tk.Frame):
 
         self.add_button = None
 
-        self.import_from_folder = ""
-        self.importWait = True
-        self.startButton = tk.Button(self.container, takefocus=True, text="Click here to select folder",
-                                     command=self.get_import_folder)
+        self.import_from_folder = "" # this is where the path to the folder is stored that the user wants to sort the photos from
+        self.startButton = tk.Button(self.container, height=int(self.h/2), width=int(self.w/2), takefocus=True, text="Click here to select folder",
+                                     command=self.get_import_folder)  # one time use (may change out button for a clickable background or something)
         self.startButton.pack()
 
 
+
+
     def get_import_folder(self):
+        # opens a dialog for the user to select import_from_folder.
         self.import_from_folder = filedialog.askdirectory(initialdir=self.base_path + "/Pictures")
         self.startButton.destroy()
+
+        # final step in initiation process
         self.get_photos()
         self.create_image()
         self.add_button = tk.Button(self.buttonFrame, text="add folder", anchor=tk.SE, command=self.add_folder_button) \
             .pack(side=tk.LEFT)
 
     def create_image(self):
-        #TODO: make it so that images get created and deleted here
+        # first, clears container (a.k.a canvas)
+        # than, sets preps canvas for image load and loads image into canvas
         self.container.delete(tk.ALL)
         if self.container.winfo_width() != self.w:
             self.container.configure(height=self.h-self.buttonHeightOffset, width=self.w)
-        self.container.create_image(self.w/2, self.h/2, image=self.photos[self.photo_counter])
+        self.container.create_image(self.w/2, self.h/2, image=self.photos[self.photo_counter][0])
         print(self.container.winfo_height())
 
     def get_base_path(self):
+        # fetches the user's home folder and stores the user's OS type
+        # also, creates homefolder for this application (if it doesn't already exist)
         base_path = ""
         user = getpass.getuser()
         if platform.startswith("linux") or platform.startswith("linux2"):
@@ -103,15 +120,18 @@ class GUI(tk.Frame):
         else:
 
             raise Exception("cannot find operating system")
-        if not os.path.isdir(base_path):  # make sure basepath exists, else make it
-            os.makedirs(base_path)
         return base_path
 
-    def folderButton_click(self, folder_path):
-        self.photo_counter += 1
-
+    def folderButton_click(self, button):
+        # this is basically the callback for any folderButton clicked.
+        # increments photo_counter, moves image to folderButton's path and loads new image into container
+        old_path = self.photos[self.photo_counter][1]
+        new_path = button.path + "/" + os.path.basename(old_path)
+        print(new_path)
         #TODO: make sure image gets moved to location here
+        os.rename(old_path, new_path)
 
+        self.photo_counter += 1
         self.create_image()
 
         return
@@ -122,23 +142,25 @@ class GUI(tk.Frame):
         folder = ""
         text = ""
         if answer == "yes":
-            text = folder = tk.simpledialog.askstring("Folder name", "What would you like your new folder called?")
+            # create new folder
+            text = tk.simpledialog.askstring("Folder name", "What would you like your new folder called?")
             try:
-                os.mkdir(self.home_path + "/" + folder)
+                folder = self.home_path + "/" + text
+                os.mkdir(folder)
             except FileExistsError:
                 tk.messagebox.showwarning('', 'Folder already exists')
                 self.add_folder_button()
                 return
         elif answer == "no":
-            #select folder
+            # select existing folder
             folder = filedialog.askdirectory(initialdir=self.home_path)
             folder_tuple = folder.split('/')
             text = folder_tuple[len(folder_tuple)-1]
         else:
+            # this is where the user cancels the dialog
             return
 
-        #text = tk.simpledialog.askstring(title="name", prompt="what is the name of this folder?")
-        button = FolderButton(self.buttonFrame, text, lambda: self.folderButton_click(folder))
+        button = FolderButton(self.buttonFrame, text, folder)  # this is THE button
         if button in self.folderButton_list:
             button.destroy()
             tk.messagebox.showwarning('', 'Folder already exists')
@@ -165,18 +187,80 @@ class GUI(tk.Frame):
         # make the image from file_path TK-ready (tk doesn't read jpg) and load these images into photos[]
         image = PIL.Image.open(file_path)
         print("old: {} + {}".format(image.width, image.height))
-        image = resize_to_screen(image, self.w, self.h-self.buttonHeightOffset) #this function resizes the image to fit the master window
+        image = resize_to_screen(image, self.w, self.h-self.buttonHeightOffset) #this function resizes the image to fit the window
         print("new: {} + {}".format(image.width, image.height))
         photoimage = PIL.ImageTk.PhotoImage(image)
-        self.photos.append(photoimage)
+        self.photos.append((photoimage, file_path))
 
         return image
+
+    def save(self):
+        photos = []
+        folderButton_list = []
+        for photo in self.photos:
+            print(photo)
+            image =PIL.ImageTk.getimage(photo[0])
+            print(photo[1])
+            path = photo[1]
+            photos.append((image, path))
+        for button in self.folderButton_list:
+            button_tuple = button.save()
+            folderButton_list.append(button_tuple)
+
+        #TODO: photos and folderbuttonlist are tk objects, can't pickle tk objects
+        dump = {"photos": photos,
+                "photo_counter": self.photo_counter,
+                "folderButton_list": folderButton_list,
+                "platform": self.platform,
+                "base_path": self.base_path,
+                "home_path": self.home_path,
+                "buttonHeigthOffset": self.buttonHeightOffset,
+                "w": self.w,
+                "h": self.h,
+                }
+
+        try:
+            with open('config.dict', 'wb') as config_dict:
+                pickle.dump(dump, config_dict)
+        except FileNotFoundError:
+            print("filenotfound-----------------------------------")
+
+
+class MenuBar(tk.Menu):
+
+    def __init__(self, master, app):
+        super(MenuBar, self).__init__(master=master)
+        self.app = app
+        self.add_menu()
+        pass
+
+    def add_menu(self):
+        filemenu = tk.Menu(self, tearoff=0)
+        filemenu.add_command(label="Exit", command=self.exit)
+        filemenu.add_command(label="Save", command=app.save)
+        filemenu.add_command(label="Load", command=self.load)
+        self.add_cascade(label="App", menu=filemenu)
+
+    def exit(self):
+        self.save()
+        self.master.destroy()
+
+    def save(self):
+        app.save()
+
+    def load(self):
+        with open('config_dict') as config_dict:
+            dump = pickle.load(config_dict)
+            print(dump)
+
 
 
 root = tk.Tk()
 root.title("Photo Sorter")
 app = GUI(master=root)
-app.mainloop()
+menubar = MenuBar(root, app)
+root.config(menu=menubar) #configure(menu=menubar)
+root.mainloop()
 root.destroy()
 
 
