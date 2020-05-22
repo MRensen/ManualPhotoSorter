@@ -214,16 +214,13 @@ class GUI(tk.Frame):
                 "platform": self.platform,
                 "base_path": self.base_path,
                 "home_path": self.home_path,
+                "importFolder": self.import_from_folder,
                 "buttonHeigthOffset": self.buttonHeightOffset,
                 "w": self.w,
-                "h": self.h,
+                "h": self.h
                 }
 
-        try:
-            with open('config.dict', 'wb') as config_dict:
-                pickle.dump(dump, config_dict)
-        except FileNotFoundError:
-            print("filenotfound-----------------------------------")
+        return dump
 
 
 class MenuBar(tk.Menu):
@@ -246,7 +243,12 @@ class MenuBar(tk.Menu):
         self.master.destroy()
 
     def save(self):
-        app.save()
+        dump = app.save()
+        try:
+            with open('config.dict', 'wb') as config_dict:
+                pickle.dump(dump, config_dict)
+        except FileNotFoundError:
+            print("filenotfound-----------------------------------")
 
     def load(self):
         with open('config_dict') as config_dict:
