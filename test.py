@@ -17,16 +17,16 @@ class TestSave(unittest.TestCase):
         FB = root.FolderButton(app, "test", "/home/mark/Pictures/PhotoSorter")
         app.folderButton_list = [FB]
         #TODO: update this dict so that it conatins the expected results of app.save()
-        result = {"photos": photos,
-                "photo_counter": self.photo_counter,
-                "folderButton_list": folderButton_list,
-                "platform": self.platform,
-                "base_path": self.base_path,
-                "home_path": self.home_path,
-                "importFolder": self.import_from_folder,
-                "buttonHeigthOffset": self.buttonHeightOffset,
-                "w": self.w,
-                "h": self.h
+        result = {#"photos": photos,
+                "photo_counter": app.photo_counter,
+                #"folderButton_list": folderButton_list,
+                "platform": app.platform,
+                "base_path": app.base_path,
+                "home_path": app.home_path,
+                "importFolder": app.import_from_folder,
+                "buttonHeigthOffset": app.buttonHeightOffset,
+                "w": app.w,
+                "h": app.h
                 }
         self.assertEqual(app.save(), result, "dict should be as is")
 
