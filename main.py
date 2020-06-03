@@ -33,6 +33,13 @@ class FolderButton(tk.Button):
         return self.text, self.path
 
 #TODO: idea: create a function to create FolderButtons and replace all FolderButton creations to that function
+    #this is mainly for MenuBar.change_selected_button
+
+    def change(self, text=None, path=None):
+        if text:
+            self.text = text
+        if path:
+            self.path = path
 
 
 
@@ -99,7 +106,10 @@ class GUI(tk.Frame):
         # opens a dialog for the user to select import_from_folder.
         if not self.import_from_folder:
             self.import_from_folder = filedialog.askdirectory(initialdir=self.base_path + "/Pictures")
-        self.startButton.destroy()
+        if self.import_from_folder:
+            self.startButton.destroy()
+        else:
+            return
 
         # final step in initiation process
         self.get_photos()
@@ -152,38 +162,13 @@ class GUI(tk.Frame):
         return
 
     def add_folder_button(self):
-        # user wants to add a new folder to export to. Check if folder already exists on drive, else make new folder.
-        answer = tk.messagebox.askquestion("new folder", "Do you want to create a new folder? \n Select 'no' if you want to use an existing folder")
-        folder = ""
-        text = ""
-        if answer == "yes":
-            # create new folder
-            text = tk.simpledialog.askstring("Folder name", "What would you like your new folder called?")
-            try:
-                folder = self.home_path + "/" + text
-                os.mkdir(folder)
-            except FileExistsError:
-                tk.messagebox.showwarning('', 'Folder already exists')
-                self.add_folder_button()
-                return
-        elif answer == "no":
-            # select existing folder
-            folder = filedialog.askdirectory(initialdir=self.home_path)
-            folder_tuple = folder.split('/')
-            text = folder_tuple[len(folder_tuple)-1]
-        else:
-            # this is where the user cancels the dialog
+        text, folder = self.selected_folder_button()
+        if text == None or folder == None:
             return
 
         button = FolderButton(self.buttonFrame, text, folder)  # this is THE button
-        if button in self.folderButton_list:
-            button.destroy()
-            tk.messagebox.showwarning('', 'Folder already exists')
-            self.add_folder_button()
-            return
-        else:
-            self.folderButton_list.append(button)
-        print(self.folderButton_list)
+
+        self.folderButton_list.append(button)
         button.pack(side=tk.LEFT)
         self.buttonFrame.pack()
         return
@@ -200,11 +185,13 @@ class GUI(tk.Frame):
 
     def create_tk_image_from_path(self, file_path):
         # make the image from file_path TK-ready (tk doesn't read jpg) and load these images into photos[]
-        print("w:{} + h:{} + offset:{} + path:{}".format(self.w, self.h, self.buttonHeightOffset, file_path))
+        if file_path in [tup1[1] for tup1 in self.photos]:
+            print("File_path already exists: {}".format(file_path))
+       # print("w:{} + h:{} + offset:{} + path:{}".format(self.w, self.h, self.buttonHeightOffset, file_path))
         image = PIL.Image.open(file_path)
-        print("old: {} + {}".format(image.width, image.height))
+       # print("old: {} + {}".format(image.width, image.height))
         image = resize_to_screen(image, self.w, self.h-self.buttonHeightOffset) #this function resizes the image to fit the window
-        print("new: {} + {}".format(image.width, image.height))
+       # print("new: {} + {}".format(image.width, image.height))
         photoimage = PIL.ImageTk.PhotoImage(image)
         self.photos.append((photoimage, file_path))
 
@@ -222,7 +209,7 @@ class GUI(tk.Frame):
 
         #TODO: photos and folderbuttonlist are tk objects, can't pickle tk objects
         dump = {"photos": photos,
-                "photo_counter": self.photo_counter,
+                #"photo_counter": self.photo_counter,
                 "folderButton_list": folderButton_list,
                 "platform": self.platform,
                 "base_path": self.base_path,
@@ -237,8 +224,7 @@ class GUI(tk.Frame):
 
     def load(self, dump):
         print("loading....")
-        folderButton_list = []
-        self.photo_counter = dump.get("photo_counter")
+        #self.photo_counter = dump.get("photo_counter") #maybe not use this now that images don't load when they've been moved
         self.platform = dump.get("platform")
         self.base_path = dump.get("base_path")
         self.home_path = dump.get("home_path")
@@ -247,22 +233,28 @@ class GUI(tk.Frame):
         self.w = dump.get("w")
         self.h = dump.get("h")
         for path in dump.get("photos"):
-            # tup0 = PIL.ImageTk.PhotoImage(tup[0]) #TODO: saving/loading the image might be bad. maybe just load/save the path and use create_tk_image_from_path to load the images
-            # photos.append((tup0, tup[1]))
-            self.create_tk_image_from_path(path)
+            try:
+                self.create_tk_image_from_path(path)
+            except FileNotFoundError:
+                print("File not found: [{}]\n".format(path))
         if not self.add_button:
             self.addButton()
         for tup in dump.get("folderButton_list"):
             button = FolderButton(self.buttonFrame, tup[0], tup[1])
-            if button in self.folderButton_list:
-                button.destroy()
-                tk.messagebox.showwarning('', 'Folder already exists')
-                return
-            else:
+            for folderbutton in self.folderButton_list:
+                if folderbutton.text == button.text and folderbutton.path == button.path:
+                    button.destroy()
+                    tk.messagebox.showwarning('', 'Folder already exists')
+                    return
+
+            if os.path.exists(button.path):
                 self.folderButton_list.append(button)
-            print(self.folderButton_list)
-            button.pack(side=tk.LEFT)
-            self.buttonFrame.pack()
+                print(self.folderButton_list)
+                button.pack(side=tk.LEFT)
+            else:
+                button.destroy()
+                tk.messagebox.showwarning('', 'Folder \'{}\' doesn\'t exist'.format(button.text))
+        self.buttonFrame.pack()
 
         # continuation of initialization process
         if self.startButton.winfo_exists() > 0:
@@ -271,6 +263,42 @@ class GUI(tk.Frame):
 
         print("loaded")
 
+    def selected_folder_button(self, button=None):
+        answer = ""
+        if not button:
+            answer = tk.messagebox.askquestion("Do you want to create a new folder?",
+                                             "Select 'yes' if you want to create a new folder \n Select 'no' if you want to use an existing folder")
+        else:
+            answer = "yes"
+        folder = ""
+        text = ""
+        if answer == "yes":
+            # create new folder
+            text = tk.simpledialog.askstring("Folder name", "How do you want to name your folder?")
+            try:
+                folder = self.home_path + "/" + text
+                if not folder:
+                    os.mkdir(folder)
+                else:
+                    os.rename(button.path, folder)
+
+            except FileExistsError:
+                tk.messagebox.showwarning('', 'Folder already exists')
+                self.selected_folder_button()
+                return
+        elif answer == "no":
+            # select existing folder
+            folder = filedialog.askdirectory(initialdir=self.home_path)
+            folder_tuple = folder.split('/')
+            text = folder_tuple[len(folder_tuple) - 1]
+            for button in self.folderButton_list:
+                if button.text == text:
+                    tk.messagebox.showwarning('', 'Folder already exists')
+                    self.selected_folder_button()
+        else:
+            # this is where the user cancels the dialog
+            return None, None
+        return text, folder
 
 
 class MenuBar(tk.Menu):
@@ -280,6 +308,9 @@ class MenuBar(tk.Menu):
         self.app = app
         self.add_menu()
         self.intvar = tk.IntVar()
+        self.intvar.set(len(app.folderButton_list))
+        self.buttonchangemenu = None
+        self.trace_id = 0
         pass
 
     def add_menu(self):
@@ -292,41 +323,72 @@ class MenuBar(tk.Menu):
         buttonmenu = tk.Menu(self, tearoff=0)
         buttonmenu.add_command(label="add button", command=app.add_button)
         buttonmenu.add_command(label="delete button", command=self.delete_button)
-        buttonmenu.add_command(label="change button", command=self.change_button)
+        buttonmenu.add_command(label="rename button", command=self.rename_button)
         self.add_cascade(label="Buttons", menu=buttonmenu)
 
     def delete_button(self):
         pass
 
-    def change_button(self):
-        buttonchangemenu = tk.Toplevel(root)
-        self.intvar.trace('w', self.change_selected_button)
+    def buttonchange(self, func):
+        if self.trace_id:
+            self.intvar.trace_vdelete('w', self.trace_id)
+        self.buttonchangemenu = tk.Toplevel(root)
         for idx, button in enumerate(app.folderButton_list):
-            tk.Radiobutton(master=buttonchangemenu, text=button.text,
+            print("{} idx = {}".format(idx, button.text))
+            tk.Radiobutton(master=self.buttonchangemenu, text=button.text,
                            variable=self.intvar, value=idx, indicatoron=0).pack()
             print(idx)
-        tk.Button(master=buttonchangemenu, text="Done", bg='red', bd=10, command=lambda: buttonchangemenu.destroy())\
+            self.intvar.set(idx+1)
+        tk.Button(master=self.buttonchangemenu, text="Done", bg='red', bd=10,
+                  command=self.buttonchangemenu.destroy) \
             .pack(side=tk.TOP)
+
+        self.trace_id = self.intvar.trace('w', func)
+
+    def rename_button(self):
+        self.buttonchange(self.change_selected_button)
 
 
     def change_selected_button(self, *args):
-        def selected_callback(self, *args):
-            print(args)
-            if text:
-                button.text = text
-            if path:
-                button.path = path
-            selectedmenu.destroy()
         button = app.folderButton_list[self.intvar.get()]
-        selectedmenu = tk.Toplevel(root).bind("<Enter>", selected_callback)
-        text = tk.StringVar()
-        text.set("enter button name")
-        tk.Label(selectedmenu, text="folder name:").pack()
-        entry = tk.Entry(master=selectedmenu, textvariable=text).pack()
-        tk.Label(master=selectedmenu, text="folder path:").pack()
-        path = tk.Button(master=selectedmenu, text="select folder", command=app.add_folder_button()).pack()
-        tk.Button(master=selectedmenu, text="Done", bg='red', bd=10).pack()
-        print(path)
+        text = tk.simpledialog.askstring("Folder name", "How do you want to rename your folder?")
+        if not text:
+            return
+        else:
+            #TODO: changes direcotry name, but not the shown name of the button in the tk window
+            folder = app.home_path + "/" + text
+            os.rename(button.path, folder)
+            button.change(text=text, path=folder)
+            button.pack()
+            app.buttonFrame.pack()
+            self.buttonchangemenu.quit()
+
+        # path = ""
+        # text = tk.StringVar()
+        #
+        # def selected_callback(self, *args):
+        #     if not text.get().__eq__(stringvartext):
+        #         button.text = text
+        #     if path:
+        #         button.path = path
+        #     selectedmenu.destroy()
+        #     print("path:{} + text:{}".format(path, text))
+        #
+        # button = app.folderButton_list[self.intvar.get()]
+        # selectedmenu = tk.Toplevel(root)
+        # #selectedmenu.bind("<Enter>", selected_callback)
+        # stringvartext = "enter button name"
+        # text.set(stringvartext)
+        # folderlabel = tk.Label(selectedmenu, text="folder name:")
+        # entry = tk.Entry(master=selectedmenu, textvariable=text)
+        # pathlabel = tk.Label(master=selectedmenu, text="folder path:")
+        # text, path = tk.Button(master=selectedmenu, text="select folder", command=lambda: app.change_selected_folder_button())
+        # donebutton = tk.Button(master=selectedmenu, text="Done", bg='red', bd=10)
+        # folderlabel.pack()
+        # entry.pack()
+        # pathlabel.pack()
+        # path.pack()
+        # donebutton.pack(side=tk.BOTTOM)
 
 
 
@@ -346,9 +408,10 @@ class MenuBar(tk.Menu):
         except FileNotFoundError:
             print("filenotfound-----------------------------------")
         except TypeError:
-            print(TypeError.with_traceback())
+            print("typeError-------------------------")
             print(dump)
-        config_dict.close()
+        if not config_dict.closed:
+            config_dict.close()
 
     def load(self):
         with open('config.dict', 'rb') as config_dict:
