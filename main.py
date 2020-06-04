@@ -140,8 +140,8 @@ class GUI(tk.Frame):
             base_path = "/home/" + user
         elif platform.startswith("win32"):
             self.platform = "win32"
-            #TODO: can't find where base_path is stored in windows explorer, find it.
-            base_path = "/c/Users/" + user
+            base_path = "/Users/" + user
+            print(base_path)
         else:
 
             raise Exception("cannot find operating system")
@@ -210,7 +210,6 @@ class GUI(tk.Frame):
             button_tuple = button.save()
             folderButton_list.append(button_tuple)
 
-        #TODO: photos and folderbuttonlist are tk objects, can't pickle tk objects
         dump = {"photos": photos,
                 #"photo_counter": self.photo_counter,
                 "folderButton_list": folderButton_list,
