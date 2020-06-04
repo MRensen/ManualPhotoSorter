@@ -69,7 +69,7 @@ def resize_to_screen(img, masterw, masterh):
 class GUI(tk.Frame):
     def __init__(self, master=None):
         tk.Frame.__init__(self, master)
-        self.w, self.h = 700, 700
+        self.w, self.h = 500, 500
         self.buttonHeightOffset = 30
         master.minsize(width=self.w, height=self.h)
         master.maxsize(width=self.w, height=self.h)
@@ -160,6 +160,9 @@ class GUI(tk.Frame):
         self.create_image()
 
         return
+
+    def buttonFrame_update(self):
+        self.buttonFrame.pack()
 
     def add_folder_button(self):
         text, folder = self.selected_folder_button()
@@ -263,13 +266,9 @@ class GUI(tk.Frame):
 
         print("loaded")
 
-    def selected_folder_button(self, button=None):
-        answer = ""
-        if not button:
-            answer = tk.messagebox.askquestion("Do you want to create a new folder?",
+    def selected_folder_button(self):
+        answer = tk.messagebox.askquestion("Do you want to create a new folder?",
                                              "Select 'yes' if you want to create a new folder \n Select 'no' if you want to use an existing folder")
-        else:
-            answer = "yes"
         folder = ""
         text = ""
         if answer == "yes":
@@ -277,11 +276,7 @@ class GUI(tk.Frame):
             text = tk.simpledialog.askstring("Folder name", "How do you want to name your folder?")
             try:
                 folder = self.home_path + "/" + text
-                if not folder:
-                    os.mkdir(folder)
-                else:
-                    os.rename(button.path, folder)
-
+                os.mkdir(folder)
             except FileExistsError:
                 tk.messagebox.showwarning('', 'Folder already exists')
                 self.selected_folder_button()
@@ -327,7 +322,9 @@ class MenuBar(tk.Menu):
         self.add_cascade(label="Buttons", menu=buttonmenu)
 
     def delete_button(self):
-        pass
+        app.folderButton_list[self.intvar.get()] = None
+        app.buttonFrame_update()
+
 
     def buttonchange(self, func):
         if self.trace_id:
@@ -360,35 +357,9 @@ class MenuBar(tk.Menu):
             os.rename(button.path, folder)
             button.change(text=text, path=folder)
             button.pack()
-            app.buttonFrame.pack()
+            app.buttonFrame_update()
             self.buttonchangemenu.quit()
 
-        # path = ""
-        # text = tk.StringVar()
-        #
-        # def selected_callback(self, *args):
-        #     if not text.get().__eq__(stringvartext):
-        #         button.text = text
-        #     if path:
-        #         button.path = path
-        #     selectedmenu.destroy()
-        #     print("path:{} + text:{}".format(path, text))
-        #
-        # button = app.folderButton_list[self.intvar.get()]
-        # selectedmenu = tk.Toplevel(root)
-        # #selectedmenu.bind("<Enter>", selected_callback)
-        # stringvartext = "enter button name"
-        # text.set(stringvartext)
-        # folderlabel = tk.Label(selectedmenu, text="folder name:")
-        # entry = tk.Entry(master=selectedmenu, textvariable=text)
-        # pathlabel = tk.Label(master=selectedmenu, text="folder path:")
-        # text, path = tk.Button(master=selectedmenu, text="select folder", command=lambda: app.change_selected_folder_button())
-        # donebutton = tk.Button(master=selectedmenu, text="Done", bg='red', bd=10)
-        # folderlabel.pack()
-        # entry.pack()
-        # pathlabel.pack()
-        # path.pack()
-        # donebutton.pack(side=tk.BOTTOM)
 
 
 
@@ -396,7 +367,7 @@ class MenuBar(tk.Menu):
 
     def exit(self):
         ans = messagebox.askyesno("Quit", "Do you want to save before quitting?")
-        if ans == messagebox.YES:
+        if ans:
             self.save()
         root.destroy()
 
