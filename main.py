@@ -378,7 +378,6 @@ class MenuBar(tk.Menu):
         if not text:
             return
         else:
-            #TODO: changes direcotry name, but not the shown name of the button in the tk window
             folder = app.home_path + "/" + text
             os.rename(button.path, folder)
             button.change(text=text, path=folder)
@@ -427,6 +426,7 @@ root.config(menu=menubar)
 root.protocol("WM_DELETE_WINDOW", on_closing)
 root.mainloop()
 root.destroy()
+
 
 
 
